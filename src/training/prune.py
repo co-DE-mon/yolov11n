@@ -148,6 +148,7 @@ def prune(args: argparse.Namespace):
     # Filter out custom config keys that are not valid ultralytics arguments
     invalid_keys = {
         "epochs_pre",
+        "epochs_post",
         "prune_method",
         "model_presets",
         "model_families",
