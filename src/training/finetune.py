@@ -37,13 +37,11 @@ def fine_tune_yolov11(
     project_path.mkdir(parents=True, exist_ok=True)
 
     # Load model (this downloads or loads the YOLOv11n architecture + weights)
-    model = YOLO(
-        str(
-            (base_dir / model_path)
-            if not Path(model_path).is_absolute()
-            else model_path
-        )
+    model_path = str(
+        (base_dir / model_path) if not Path(model_path).is_absolute() else model_path
     )
+    print(f"🔧 Loading model from: {model_path}")
+    model = YOLO(model_path)
 
     # Fine-tune / train
     model.train(
