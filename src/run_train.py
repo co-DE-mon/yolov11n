@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -59,9 +60,9 @@ def load_config_with_inheritance(config_path: Path) -> dict:
     return config
 
 
-def run(cmd: list[str]) -> int:
+def run(cmd: list[str], env: dict | None = None) -> int:
     """Run command with live output."""
-    proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stderr)
+    proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stderr, env=env)
     proc.wait()
     return proc.returncode
 
@@ -147,6 +148,9 @@ def main():
     for batch in batch_sizes:
         print(f"\n[{dataset}] [Batch {batch}] Finetuning baseline...")
 
+        # Set environment for subprocess
+        env = {"PYTHONPATH": str(PROJECT_ROOT), **os.environ}
+
         status = run(
             [
                 sys.executable,
@@ -169,7 +173,8 @@ def main():
                 runs,
                 "--name",
                 f"{dataset}_batch{batch}_baseline",
-            ]
+            ],
+            env=env,
         )
 
         if status != 0:
