@@ -1,10 +1,16 @@
-# TXL Dataset Experiment Config
+# TXL Dataset Configuration (inherits from config/default.yaml)
 dataset: TXL
 data: data/TXL/data.yaml
 
-model: yolo11n.pt
-epochs_pre: 100
-epochs_post: 50
-batch_sizes: [4, 8]
-prune_ratios: [20, 50]
-device: "0"
+# Model configuration (override defaults)
+# model_size: s              # Uncomment to use small model instead of nano
+# model_size: m              # Uncomment to use medium model
+# model_size: l              # Uncomment to use large model
+# model_size: x              # Uncomment to use extra large model
+
+# All training parameters inherited from config/default.yaml:
+# - epochs_pre: 100
+# - epochs_post: 50
+# - batch_sizes: [4, 8]
+# - prune_ratios: [20, 50]
+# - device: "0"
