@@ -9,15 +9,15 @@ mode: train # (str) YOLO mode, i.e. train, val, predict, export, track, benchmar
 # Train settings -------------------------------------------------------------------------------------------------------
 model: # (str, optional) path to model file, i.e. yolov8n.pt or yolov8n.yaml
 data: # (str, optional) path to data file, i.e. coco8.yaml
-epochs: 100 # (int) number of epochs to train for
+epochs: 2 # (int) number of epochs to train for
 time: # (float, optional) max hours to train; overrides epochs if set
 patience: 100 # (int) early stop after N epochs without val improvement
-batch: 16 # (int) batch size; use -1 for AutoBatch
+batch: 2 # (int) batch size; use -1 for AutoBatch
 imgsz: 640 # (int | list) train/val use int (square); predict/export may use [h,w]
 save: True # (bool) save train checkpoints and predict results
 save_period: -1 # (int) save checkpoint every N epochs; disabled if < 1
 cache: False # (bool | str) cache images in RAM (True/'ram') or on 'disk' to speed dataloading; False disables
-device: # (int | str | list) device: 0 or [0,1,2,3] for CUDA, 'cpu'/'mps', or -1/[-1,-1] to auto-select idle GPUs
+device: "0" # (int | str | list) device: 0 or [0,1,2,3] for CUDA, 'cpu'/'mps', or -1/[-1,-1] to auto-select idle GPUs
 workers: 8 # (int) dataloader workers (per RANK if DDP)
 project: # (str, optional) project name for results root
 name: # (str, optional) experiment name; results in 'project/name'
@@ -128,3 +128,32 @@ cfg: # (str, optional) path to a config.yaml that overrides defaults
 
 # Tracker settings ------------------------------------------------------------------------------------------------------
 tracker: botsort.yaml # (str) tracker config file: botsort.yaml or bytetrack.yaml
+
+# Model families and their configurations
+model_families:
+  yolo11:
+    sizes: [n, s]
+    default_size: n
+    description: "YOLOv11 model family"
+    size_descriptions:
+      n: "nano - Fastest, smallest model"
+      s: "small - Balanced speed and accuracy"
+
+# Default model configuration
+model_size: n              # Options: n, s
+model_family: yolo11        # Model family
+
+# Model size presets for easy switching
+model_presets:
+  fast: n                  # For quick testing/development
+  balanced: s               # Good balance of speed and accuracy
+
+# Training configuration
+epochs_pre: 1             # Pre-pruning training epochs
+epochs_post: 1             # Post-pruning training epochs
+batch_sizes: [1, 2]         # Batch sizes to test
+
+# Pruning configuration
+prune_ratios: [20, 50]     # Default pruning percentages to test
+prune_method: "structured"    # Pruning method: structured, unstructured
+prune_target: "global"       # Pruning target: global, layer-wise

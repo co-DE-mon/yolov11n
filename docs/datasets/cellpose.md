@@ -63,9 +63,27 @@ To re-run conversion:
 python scripts/convert_cellpose.py
 ```
 
+## Configuration
+
+The Cellpose dataset uses `config/datasets/Cellpose.yaml` which inherits from `config/default.yaml`.
+
+To use different model sizes, modify the inherited `model_size` parameter:
+
+```yaml
+# In config/datasets/Cellpose.yaml  
+model_size: m  # Override default model size
+```
+
+Or use command line:
+```bash
+python -m src.run_train --config config/datasets/Cellpose.yaml --model-size m
+```
+
+Available model sizes: n (nano), s (small), m (medium), l (large), x (extra large)
+
 ## Usage
 
-Update `config/experiment.yaml` to use this dataset:
+Update `config/datasets/Cellpose.yaml` to use this dataset:
 
 ```yaml
 dataset: Cellpose
@@ -74,7 +92,7 @@ data: data/Cellpose/data.yaml
 
 Then run experiments:
 ```bash
-./scripts/run_experiment.sh
+python -m src.run_train --config config/datasets/Cellpose.yaml
 ```
 
 ## Citation

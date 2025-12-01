@@ -40,6 +40,24 @@ TXL-PBC/
 - `metadata.csv`: Mapping of image filenames to source datasets.
 - `annotation_protocol.pdf`: Manual annotation guidelines.
 
+## Configuration
+
+The TXL dataset uses `config/datasets/TXL.yaml` which inherits from `config/default.yaml`. 
+
+To use different model sizes, modify the inherited `model_size` parameter:
+
+```yaml
+# In config/datasets/TXL.yaml
+model_size: s  # Override default model size
+```
+
+Or use command line:
+```bash
+python -m src.run_train --config config/datasets/TXL.yaml --model-size s
+```
+
+Available model sizes: n (nano), s (small), m (medium), l (large), x (extra large)
+
 ## Usage
 
 - The dataset can be used directly with object detection frameworks such as YOLO.
