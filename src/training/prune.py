@@ -145,7 +145,23 @@ def prune(args: argparse.Namespace):
     pruning_cfg["project"] = save_dir_after
     pruning_cfg["exist_ok"] = True
 
-    model.train_v2(pruning=True, **pruning_cfg)
+    # Filter out custom config keys that are not valid ultralytics arguments
+    invalid_keys = {
+        "epochs_pre",
+        "prune_method",
+        "model_presets",
+        "model_families",
+        "model_family",
+        "model_size",
+        "batch_sizes",
+        "prune_ratios",
+        "prune_target",
+    }
+
+    # Create a filtered config dict with only valid ultralytics arguments
+    filtered_cfg = {k: v for k, v in pruning_cfg.items() if k not in invalid_keys}
+
+    model.train_v2(pruning=True, **filtered_cfg)
 
 
 if __name__ == "__main__":
