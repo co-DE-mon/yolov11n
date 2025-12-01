@@ -128,9 +128,12 @@ def prune(args: argparse.Namespace):
     save_dir_before = base_dir / "runs" / "pruned_models"
     save_dir_after = base_dir / "runs"
     save_dir_before.mkdir(parents=True, exist_ok=True)
+
+    # Include model_size in naming if provided
+    model_size_str = f"_{args.model_size}" if args.model_size else ""
     pruned_model_path = (
         save_dir_before
-        / f"{args.dataset}_batch{args.batch_size}_pruned{int(args.target_prune_rate * 100)}_before_finetune.pt"
+        / f"{args.dataset}{model_size_str}_batch{args.batch_size}_pruned{int(args.target_prune_rate * 100)}_before_finetune.pt"
     )
     torch.save(model.model.state_dict(), pruned_model_path)
 
@@ -138,7 +141,7 @@ def prune(args: argparse.Namespace):
     for name, param in model.model.named_parameters():
         param.requires_grad = True
     pruning_cfg["name"] = (
-        f"{args.dataset}_batch{args.batch_size}_pruned{int(args.target_prune_rate * 100)}"
+        f"{args.dataset}{model_size_str}_batch{args.batch_size}_pruned{int(args.target_prune_rate * 100)}"
     )
     pruning_cfg["epochs"] = args.postprune_epochs
     pruning_cfg["batch"] = args.batch_size

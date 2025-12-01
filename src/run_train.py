@@ -111,9 +111,17 @@ def main():
     print(f"Loaded config: {args.config} (inherits from config/default.yaml)")
 
     # CLI args override config values
-    model_size = args.model_size or config.get("model_size", "n")
     model_family = args.model_family or config.get("model_family", "yolo11")
-    model = construct_model_path(model_family, model_size)
+
+    # Determine model sizes to train
+    if args.model_size:
+        # CLI specified a single model size
+        model_sizes = [args.model_size]
+    else:
+        # Get all sizes from config for the model family
+        family_config = config.get("model_families", {}).get(model_family, {})
+        model_sizes = family_config.get("sizes", [config.get("model_size", "n")])
+
     data = args.data or config.get("data", str(PROJECT_ROOT / "data/TXL/data.yaml"))
     dataset = args.dataset or config.get("dataset") or extract_dataset_name(data)
     epochs_pre = (
@@ -139,80 +147,87 @@ def main():
 
     print(f"=== Training Experiment ===")
     print(f"Dataset: {dataset}")
-    print(f"Model: {model_family}{model_size}")
+    print(f"Model family: {model_family}")
+    print(f"Model sizes: {model_sizes}")
     print(f"Batch sizes: {batch_sizes}")
     print(f"Prune ratios: {prune_ratios}")
     print(f"Epochs (pre/post): {epochs_pre}/{epochs_post}")
     print(f"Started: {datetime.now()}")
 
-    for batch in batch_sizes:
-        print(f"\n[{dataset}] [Batch {batch}] Finetuning baseline...")
+    for model_size in model_sizes:
+        model = construct_model_path(model_family, model_size)
+        print(f"\n{'='*60}")
+        print(f"Training with model size: {model_size} ({model})")
+        print(f"{'='*60}")
 
-        # Set environment for subprocess
-        env = {"PYTHONPATH": str(PROJECT_ROOT), **os.environ}
+        for batch in batch_sizes:
+            print(f"\n[{dataset}] [Model {model_size}] [Batch {batch}] Finetuning baseline...")
 
-        status = run(
-            [
-                sys.executable,
-                str(PROJECT_ROOT / "src/training/finetune.py"),
-                "--model",
-                model,
-                "--model-size",
-                model_size,
-                "--model-family",
-                model_family,
-                "--data",
-                data,
-                "--epochs",
-                str(epochs_pre),
-                "--batch-size",
-                str(batch),
-                "--device",
-                device,
-                "--project",
-                runs,
-                "--name",
-                f"{dataset}_batch{batch}_baseline",
-            ],
-            env=env,
-        )
-
-        if status != 0:
-            print(f"[ERROR] Finetune failed for batch {batch}")
-            continue
-
-        weights = f"{runs}/{dataset}_batch{batch}_baseline/weights/best.pt"
-
-        for ratio in prune_ratios:
-            print(f"\n[{dataset}] [Batch {batch}] Pruning {ratio}%...")
+            # Set environment for subprocess
+            env = {"PYTHONPATH": str(PROJECT_ROOT), **os.environ}
 
             status = run(
                 [
                     sys.executable,
-                    str(PROJECT_ROOT / "src/training/prune.py"),
+                    str(PROJECT_ROOT / "src/training/finetune.py"),
                     "--model",
-                    weights,
+                    model,
                     "--model-size",
                     model_size,
                     "--model-family",
                     model_family,
                     "--data",
                     data,
-                    "--cfg",
-                    cfg,
-                    "--postprune_epochs",
-                    str(epochs_post),
-                    "--batch_size",
+                    "--epochs",
+                    str(epochs_pre),
+                    "--batch-size",
                     str(batch),
-                    "--target_prune_rate",
-                    str(ratio / 100),
-                    "--dataset",
-                    dataset,
-                ]
+                    "--device",
+                    device,
+                    "--project",
+                    runs,
+                    "--name",
+                    f"{dataset}_{model_size}_batch{batch}_baseline",
+                ],
+                env=env,
             )
 
             if status != 0:
-                print(f"[ERROR] Prune {ratio}% failed")
+                print(f"[ERROR] Finetune failed for batch {batch}")
+                continue
+
+            weights = f"{runs}/{dataset}_{model_size}_batch{batch}_baseline/weights/best.pt"
+
+            for ratio in prune_ratios:
+                print(f"\n[{dataset}] [Model {model_size}] [Batch {batch}] Pruning {ratio}%...")
+
+                status = run(
+                    [
+                        sys.executable,
+                        str(PROJECT_ROOT / "src/training/prune.py"),
+                        "--model",
+                        weights,
+                        "--model-size",
+                        model_size,
+                        "--model-family",
+                        model_family,
+                        "--data",
+                        data,
+                        "--cfg",
+                        cfg,
+                        "--postprune_epochs",
+                        str(epochs_post),
+                        "--batch_size",
+                        str(batch),
+                        "--target_prune_rate",
+                        str(ratio / 100),
+                        "--dataset",
+                        dataset,
+                    ]
+                )
+
+                if status != 0:
+                    print(f"[ERROR] Prune {ratio}% failed")
 
     print(f"\n=== Training Done: {datetime.now()} ===")
 

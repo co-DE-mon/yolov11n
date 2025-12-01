@@ -149,8 +149,8 @@ model_presets:
   balanced: s               # Good balance of speed and accuracy
 
 # Training configuration
-epochs_pre: 2             # Pre-pruning training epochs
-epochs_post: 2             # Post-pruning training epochs
+epochs_pre: 1             # Pre-pruning training epochs
+epochs_post: 1             # Post-pruning training epochs
 batch_sizes: [1, 2]         # Batch sizes to test
 
 # Pruning configuration

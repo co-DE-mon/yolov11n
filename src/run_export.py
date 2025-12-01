@@ -48,8 +48,9 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 def discover_models(runs_dir: Path, dataset: str) -> list[Path]:
     """Find all trained models for a dataset."""
-    pattern_baseline = re.compile(rf"{re.escape(dataset)}_batch(\d+)_baseline$")
-    pattern_pruned = re.compile(rf"{re.escape(dataset)}_batch(\d+)_pruned(\d+)$")
+    # Match: {dataset}_{model_size}_batch{N}_baseline or {dataset}_{model_size}_batch{N}_pruned{pct}
+    pattern_baseline = re.compile(rf"{re.escape(dataset)}_[nslmx]_batch(\d+)_baseline$")
+    pattern_pruned = re.compile(rf"{re.escape(dataset)}_[nslmx]_batch(\d+)_pruned(\d+)$")
 
     models = []
     for child in runs_dir.iterdir():

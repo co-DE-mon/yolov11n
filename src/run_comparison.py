@@ -57,12 +57,12 @@ PROJECT_ROOT = Path(__file__).parent.parent
 def discover_models(runs_dir: Path, dataset: str) -> dict:
     """
     Find all finetuned and pruned models for a specific dataset.
-    Returns: {batch_size: {'baseline': Path, 'pruned': {pct: Path, ...}}}
+    Returns: {model_size: {batch_size: {'baseline': Path, 'pruned': {pct: Path, ...}}}}
     """
-    # Match: {dataset}_batch{N}_baseline
-    pattern_baseline = re.compile(rf"{re.escape(dataset)}_batch(\d+)_baseline$")
-    # Match: {dataset}_batch{N}_pruned{pct}
-    pattern_pruned = re.compile(rf"{re.escape(dataset)}_batch(\d+)_pruned(\d+)$")
+    # Match: {dataset}_{model_size}_batch{N}_baseline
+    pattern_baseline = re.compile(rf"{re.escape(dataset)}_([nslmx])_batch(\d+)_baseline$")
+    # Match: {dataset}_{model_size}_batch{N}_pruned{pct}
+    pattern_pruned = re.compile(rf"{re.escape(dataset)}_([nslmx])_batch(\d+)_pruned(\d+)$")
 
     result = {}
     for child in runs_dir.iterdir():
@@ -76,15 +76,19 @@ def discover_models(runs_dir: Path, dataset: str) -> dict:
         name = child.name
 
         if m := pattern_baseline.match(name):
-            batch = int(m.group(1))
-            result.setdefault(batch, {"baseline": None, "pruned": {}})
-            result[batch]["baseline"] = weights
+            model_size = m.group(1)
+            batch = int(m.group(2))
+            result.setdefault(model_size, {})
+            result[model_size].setdefault(batch, {"baseline": None, "pruned": {}})
+            result[model_size][batch]["baseline"] = weights
 
         elif m := pattern_pruned.match(name):
-            batch = int(m.group(1))
-            pct = float(m.group(2))
-            result.setdefault(batch, {"baseline": None, "pruned": {}})
-            result[batch]["pruned"][pct] = weights
+            model_size = m.group(1)
+            batch = int(m.group(2))
+            pct = float(m.group(3))
+            result.setdefault(model_size, {})
+            result[model_size].setdefault(batch, {"baseline": None, "pruned": {}})
+            result[model_size][batch]["pruned"][pct] = weights
 
     return result
 
@@ -209,72 +213,80 @@ def main():
         print("No models found.")
         return
 
-    print(f"Found batch sizes: {sorted(models.keys())}")
+    print(f"Found model sizes: {sorted(models.keys())}")
 
     results = []
     md_tables = []
 
-    for batch_size in sorted(models.keys()):
-        info = models[batch_size]
-        baseline = info["baseline"]
+    for model_size in sorted(models.keys()):
+        print(f"\n{'='*60}")
+        print(f"Model size: {model_size}")
+        print(f"{'='*60}")
 
-        if not baseline:
-            print(f"[SKIP] Batch {batch_size}: no baseline")
-            continue
+        size_batches = models[model_size]
+        print(f"Found batch sizes: {sorted(size_batches.keys())}")
 
-        print(f"\n[Batch {batch_size}] Benchmarking...")
+        for batch_size in sorted(size_batches.keys()):
+            info = size_batches[batch_size]
+            baseline = info["baseline"]
 
-        # Baseline stats
-        base_params, base_gflops = get_model_stats(baseline, args.imgsz)
-        base_pt_ms = benchmark_pytorch(
-            baseline, args.imgsz, args.batch, args.iters, args.device
-        )
-        base_onnx_ms = benchmark_onnx(baseline, args.imgsz, args.batch, args.iters)
+            if not baseline:
+                print(f"[SKIP] Model {model_size}, Batch {batch_size}: no baseline")
+                continue
 
-        md_rows = [
-            f"### Batch size {batch_size}",
-            "| Pruning % | Params (M) | FLOPs Reduction | PyTorch Speedup | ONNX Speedup |",
-            "|-----------|-----------:|----------------:|----------------:|-------------:|",
-            f"| 0% (baseline) | {base_params:.2f} | - | 1.00x | 1.00x |",
-        ]
+            print(f"\n[Model {model_size}] [Batch {batch_size}] Benchmarking...")
 
-        for pct in sorted(info["pruned"].keys()):
-            pruned_path = info["pruned"][pct]
-            print(f"  Pruning {pct}%...")
-
-            params, gflops = get_model_stats(pruned_path, args.imgsz)
-            pt_ms = benchmark_pytorch(
-                pruned_path, args.imgsz, args.batch, args.iters, args.device
+            # Baseline stats
+            base_params, base_gflops = get_model_stats(baseline, args.imgsz)
+            base_pt_ms = benchmark_pytorch(
+                baseline, args.imgsz, args.batch, args.iters, args.device
             )
-            onnx_ms = benchmark_onnx(pruned_path, args.imgsz, args.batch, args.iters)
+            base_onnx_ms = benchmark_onnx(baseline, args.imgsz, args.batch, args.iters)
 
-            flops_red = (gflops - base_gflops) / base_gflops * 100 if base_gflops else 0
-            pt_speedup = base_pt_ms / pt_ms if pt_ms else 0
-            onnx_speedup = (
-                base_onnx_ms / onnx_ms if onnx_ms and not np.isnan(onnx_ms) else 0
-            )
+            md_rows = [
+                f"### Model {model_size} - Batch size {batch_size}",
+                "| Pruning % | Params (M) | FLOPs Reduction | PyTorch Speedup | ONNX Speedup |",
+                "|-----------|-----------:|----------------:|----------------:|-------------:|",
+                f"| 0% (baseline) | {base_params:.2f} | - | 1.00x | 1.00x |",
+            ]
 
-            results.append(
-                {
-                    "batch": batch_size,
-                    "model_size": extract_model_size(baseline),
-                    "model_family": extract_model_family(baseline),
-                    "prune_pct": pct,
-                    "params_m": params,
-                    "gflops": gflops,
-                    "flops_reduction_pct": flops_red,
-                    "pytorch_ms": pt_ms,
-                    "onnx_ms": onnx_ms,
-                    "pytorch_speedup": pt_speedup,
-                    "onnx_speedup": onnx_speedup,
-                }
-            )
+            for pct in sorted(info["pruned"].keys()):
+                pruned_path = info["pruned"][pct]
+                print(f"  Pruning {pct}%...")
 
-            md_rows.append(
-                f"| {pct:.0f}% | {params:.2f} | {flops_red:.0f}% | {pt_speedup:.2f}x | {onnx_speedup:.2f}x |"
-            )
+                params, gflops = get_model_stats(pruned_path, args.imgsz)
+                pt_ms = benchmark_pytorch(
+                    pruned_path, args.imgsz, args.batch, args.iters, args.device
+                )
+                onnx_ms = benchmark_onnx(pruned_path, args.imgsz, args.batch, args.iters)
 
-        md_tables.append("\n".join(md_rows))
+                flops_red = (gflops - base_gflops) / base_gflops * 100 if base_gflops else 0
+                pt_speedup = base_pt_ms / pt_ms if pt_ms else 0
+                onnx_speedup = (
+                    base_onnx_ms / onnx_ms if onnx_ms and not np.isnan(onnx_ms) else 0
+                )
+
+                results.append(
+                    {
+                        "batch": batch_size,
+                        "model_size": model_size,
+                        "model_family": "yolo11",
+                        "prune_pct": pct,
+                        "params_m": params,
+                        "gflops": gflops,
+                        "flops_reduction_pct": flops_red,
+                        "pytorch_ms": pt_ms,
+                        "onnx_ms": onnx_ms,
+                        "pytorch_speedup": pt_speedup,
+                        "onnx_speedup": onnx_speedup,
+                    }
+                )
+
+                md_rows.append(
+                    f"| {pct:.0f}% | {params:.2f} | {flops_red:.0f}% | {pt_speedup:.2f}x | {onnx_speedup:.2f}x |"
+                )
+
+            md_tables.append("\n".join(md_rows))
 
     # Write CSV
     csv_path = output_dir / f"comparison_{timestamp}.csv"
