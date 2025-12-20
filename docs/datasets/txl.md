@@ -15,30 +15,34 @@ The dataset contains 1,260 images and 18,143 bounding box annotations for three 
 
 All images are annotated in YOLO format and split into training, validation, and test sets.
 
+## Download
+
+You can download the TXL-PBC dataset from the official project page or request access from the authors:
+
+- [TXL-PBC Project Page](https://github.com/ganlu69/TXL-PBC)
+- [Direct Download (if available)](https://github.com/ganlu69/TXL-PBC/releases)
+
+After downloading, extract the archive into `data/TXL/` and ensure the folder structure matches below.
+
 ## Directory Structure
 
 ```
-TXL-PBC/
-├── images/
-│   ├── train/
-│   ├── val/
-│   └── test/
-├── labels/
-│   ├── train/
-│   ├── val/
-│   └── test/
+data/TXL/
 ├── data.yaml
-├── BCCD_selection.xlsx
-├── metadata_file.xlsx
-└── annotation_protocol.pdf
+├── train/
+│   ├── images/
+│   └── labels/
+├── valid/
+│   ├── images/
+│   └── labels/
+└── test/
+    ├── images/
+    └── labels/
 ```
 
-- `images/`: Contains all images, split into train/val/test.
-- `labels/`: YOLO-format annotation files, split into train/val/test.
+- Each split (`train`, `valid`, `test`) contains its own `images/` and `labels/` subfolders.
 - `data.yaml`: YOLO configuration file.
-- `BCCD_selection.xlsx`: List of selected and excluded BCCD images.
-- `metadata.csv`: Mapping of image filenames to source datasets.
-- `annotation_protocol.pdf`: Manual annotation guidelines.
+- Additional files (e.g., `BCCD_selection.xlsx`, `metadata_file.xlsx`, `annotation_protocol.pdf`) may be present for reference.
 
 ## Usage
 

@@ -3,8 +3,8 @@ dataset: Cellpose
 data: data/Cellpose/data.yaml
 
 model: yolo11n.pt
-epochs_pre: 100
-epochs_post: 50
+epochs_pre: 1
+epochs_post: 1
 batch_sizes: [4, 8]
 prune_ratios: [20, 50]
 device: "0"

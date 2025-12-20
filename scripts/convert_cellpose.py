@@ -88,7 +88,7 @@ def process_dataset(
 
     if not img_files:
         print(f"No images found in {raw_dir}")
-        return 0, 0
+        return 0, 0, 0
 
     # Determine train/val split
     if split_ratio:
@@ -103,6 +103,19 @@ def process_dataset(
 
     processed = 0
     skipped = 0
+
+
+    # Create images/ and labels/ subfolders inside the split folder (train, valid, test)
+    images_dir = images_dir / "images"
+    labels_dir = labels_dir / "labels"
+    images_dir.mkdir(parents=True, exist_ok=True)
+    labels_dir.mkdir(parents=True, exist_ok=True)
+    if val_images_dir:
+        val_images_dir = val_images_dir / "images"
+        val_images_dir.mkdir(parents=True, exist_ok=True)
+    if val_labels_dir:
+        val_labels_dir = val_labels_dir / "labels"
+        val_labels_dir.mkdir(parents=True, exist_ok=True)
 
     # Process training files
     for img_path in train_files:
@@ -168,28 +181,29 @@ def main():
     print("Converting Cellpose dataset to YOLO format...")
     print(f"Base directory: {base_dir}")
 
+
     # Process training data with 80/20 split
     print("\n[1/2] Processing training data (80/20 split)...")
     train_processed, val_processed, train_skipped = process_dataset(
         raw_dir=base_dir / "train",
-        images_dir=base_dir / "images" / "train",
-        labels_dir=base_dir / "labels" / "train",
+        images_dir=base_dir / "train",
+        labels_dir=base_dir / "train",
         split_ratio=0.8,
-        val_images_dir=base_dir / "images" / "val",
-        val_labels_dir=base_dir / "labels" / "val",
+        val_images_dir=base_dir / "valid",
+        val_labels_dir=base_dir / "valid",
         seed=42
     )
     print(f"  Train: {train_processed} images processed")
-    print(f"  Val: {val_processed} images processed")
+    print(f"  Valid: {val_processed} images processed")
     if train_skipped:
         print(f"  Skipped: {train_skipped} images")
 
     # Process test data (no split)
     print("\n[2/2] Processing test data...")
-    test_processed, _, test_skipped = process_dataset(
+    test_processed, test_val_processed, test_skipped = process_dataset(
         raw_dir=base_dir / "test",
-        images_dir=base_dir / "images" / "test",
-        labels_dir=base_dir / "labels" / "test"
+        images_dir=base_dir / "test",
+        labels_dir=base_dir / "test"
     )
     print(f"  Test: {test_processed} images processed")
     if test_skipped:

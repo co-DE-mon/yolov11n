@@ -58,10 +58,20 @@ def prune(args: argparse.Namespace):
         if isinstance(m, Attention):
             fixed_params += sum(p.numel() for p in m.parameters(recurse=True))
 
-    target_prunable = (nparams*args.target_prune_rate)/(nparams-fixed_params)
-    if target_prunable >= 1.0:
-        target_prunable = 0.99
+    prunable_params = nparams - fixed_params
+    target_prunable = (nparams*args.target_prune_rate)/prunable_params
     pruning_ratio = target_prunable
+
+    iter_x=2
+    if args.target_prune_rate == 0.30:
+        pruning_ratio=0.34
+    if args.target_prune_rate == 0.50:
+        pruning_ratio=0.61
+    if args.target_prune_rate == 0.75:
+        pruning_ratio=0.54
+        iter_x=1
+    if target_prunable >= 1.0:
+        pruning_ratio = 0.99
 
     # Pruning step
     model.model.train()
@@ -83,7 +93,7 @@ def prune(args: argparse.Namespace):
         model.model,
         example_inputs,
         importance=tp.importance.GroupMagnitudeImportance(),
-        iterative_steps=1,
+        iterative_steps=iter_x,
         pruning_ratio=pruning_ratio,
         ignored_layers=ignored_layers,
         unwrapped_parameters=unwrapped_parameters
