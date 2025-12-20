@@ -9,7 +9,7 @@ LISC is a leukocyte (white blood cell) dataset adapted to YOLO object detection 
 
 You can download the LISC dataset from Roboflow Universe:
 
-- [LISC on Roboflow Universe](https://universe.roboflow.com/raufderakhshandeh/wbc-lisc-aug)
+- [LISC on Roboflow Universe](https://universe.roboflow.com/wbcs/wbc-lisc)
 
 ## Directory Structure
 

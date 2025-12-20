@@ -9,10 +9,7 @@ S_tools is a surgical tool detection dataset containing annotated images of surg
 You can download the S_tools dataset from Roboflow Universe:
 
 - [Surgical Tools Dataset on Roboflow Universe](https://universe.roboflow.com/surgical-tools/surgical-tools-dataset/dataset/2)
-- Direct download (YOLO format):
-  https://universe.roboflow.com/ds/1vQw1Qw7vA?key=YOUR_KEY
 
-Replace `YOUR_KEY` with your Roboflow API key if required. After downloading, extract the archive into `data/S_tools/` and ensure the folder structure matches below.
 
 ## Directory Structure
 

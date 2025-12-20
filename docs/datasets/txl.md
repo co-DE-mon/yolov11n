@@ -17,12 +17,9 @@ All images are annotated in YOLO format and split into training, validation, and
 
 ## Download
 
-You can download the TXL-PBC dataset from the official project page or request access from the authors:
+You can download the TXL-PBC dataset from the following Link:
 
-- [TXL-PBC Project Page](https://github.com/ganlu69/TXL-PBC)
-- [Direct Download (if available)](https://github.com/ganlu69/TXL-PBC/releases)
-
-After downloading, extract the archive into `data/TXL/` and ensure the folder structure matches below.
+- [TXL-PBC Datset](https://figshare.com/articles/dataset/TXL-PBC_Dataset/27073186/8)
 
 ## Directory Structure
 
