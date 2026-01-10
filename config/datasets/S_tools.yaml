@@ -3,8 +3,8 @@ dataset: S_tools
 data: data/S_tools/data.yaml
 
 model: yolo11n.pt
-epochs_pre: 1
-epochs_post: 1
-batch_sizes: [4, 8]
-prune_ratios: [20, 50]
+epochs_pre: 25
+epochs_post: 25
+batch_sizes: [2,4,8,16]
+prune_ratios: [10,20,30,50,75]
 device: "0"
