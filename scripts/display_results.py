@@ -270,14 +270,20 @@ def display_results(results: list[dict], metrics: dict, dataset: str, console: C
 
 
 def main():
+
     parser = argparse.ArgumentParser(description="Display model comparison results")
     parser.add_argument("--dataset", type=str, required=True, help="Dataset name (e.g., TXL)")
     parser.add_argument("--file", type=str, help="Specific CSV file to load (filename only)")
     parser.add_argument("--logs-dir", type=Path, default=None, help="Logs directory")
     parser.add_argument("--runs-dir", type=Path, default=None, help="Runs directory for metrics")
+    parser.add_argument("--output", type=Path, default=None, help="Output file to save results (plain text)")
     args = parser.parse_args()
 
-    console = Console()
+    # Use Console with recording if output is requested
+    if args.output:
+        console = Console(record=True)
+    else:
+        console = Console()
 
     # Determine directories
     logs_dir = args.logs_dir or (PROJECT_ROOT / "logs" / args.dataset)
@@ -286,6 +292,9 @@ def main():
     if not logs_dir.exists():
         console.print(f"[red]Error:[/red] Logs directory not found: {logs_dir}")
         console.print(f"[dim]Run 'python -m src.run_comparison --dataset {args.dataset}' first[/dim]")
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(console.export_text())
         return 1
 
     # Find CSV file
@@ -296,6 +305,9 @@ def main():
 
     if not csv_path or not csv_path.exists():
         console.print(f"[red]Error:[/red] No comparison CSV found in {logs_dir}")
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(console.export_text())
         return 1
 
     console.print(f"[dim]Loading: {csv_path.name}[/dim]")
@@ -304,6 +316,9 @@ def main():
 
     if not results:
         console.print("[yellow]Warning:[/yellow] No results found in CSV")
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(console.export_text())
         return 1
 
     # Load metrics from runs
@@ -313,6 +328,11 @@ def main():
         console.print(f"[dim]Loaded metrics from {len(metrics)} runs[/dim]")
 
     display_results(results, metrics, args.dataset, console)
+
+    # Save output if requested
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(console.export_text())
     return 0
 
 
