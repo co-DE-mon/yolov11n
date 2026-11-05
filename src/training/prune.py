@@ -154,8 +154,8 @@ def prune(args: argparse.Namespace):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', default="examples/yolov11n/runs/fine_tuned_yolo11n/weights/best.pt", help='Model path')
-    parser.add_argument('--data', default="examples/yolov11n/BCCD/data.yaml", help='DATA path')
+    parser.add_argument('--model', required=True, help='Finetuned baseline weights, e.g. runs/BCCD_batch2_baseline/weights/best.pt')
+    parser.add_argument('--data', required=True, help='Dataset YAML, e.g. data/BCCD/data.yaml')
     parser.add_argument('--cfg', default='config/default.yaml',
                         help='Pruning config file.'
                              ' This file should have same format with ultralytics/yolo/cfg/default.yaml')

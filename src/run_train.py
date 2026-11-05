@@ -2,9 +2,8 @@
 Run training experiments: finetune baseline + prune at various ratios.
 
 Usage:
-    python -m src.run_train                          # Use config/experiment.yaml
-    python -m src.run_train --config config/my_exp.yaml
-    python -m src.run_train --batch-sizes 4 8        # Override config values
+    python -m src.run_train --config config/datasets/TXL.yaml
+    python -m src.run_train --config config/datasets/TXL.yaml --batch-sizes 4 8   # Override config values
 """
 
 import argparse
@@ -40,8 +39,8 @@ def extract_dataset_name(data_path: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="Run finetune + prune experiments")
-    parser.add_argument("--config", type=Path, default=PROJECT_ROOT / "config/experiment.yaml",
-                        help="Path to experiment config YAML")
+    parser.add_argument("--config", type=Path, required=True,
+                        help="Path to experiment config YAML (e.g. config/datasets/TXL.yaml)")
     parser.add_argument("--model", default=None)
     parser.add_argument("--data", default=None)
     parser.add_argument("--dataset", default=None, help="Dataset name (auto-extracted from --data if not provided)")
