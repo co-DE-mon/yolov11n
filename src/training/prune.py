@@ -136,7 +136,9 @@ def prune(args: argparse.Namespace):
     save_dir_after = base_dir / "runs"
     save_dir_before.mkdir(parents=True, exist_ok=True)
     pruned_model_path = save_dir_before / f"{args.dataset}_batch{args.batch_size}_pruned{int(args.target_prune_rate*100)}_before_finetune.pt"
-    torch.save(model.model.state_dict(), pruned_model_path)
+    # Save the full module: a state_dict can't be reloaded because pruning changed the architecture.
+    # The {"model": ...} layout lets YOLO(pruned_model_path) load it, e.g. to measure pre-finetune mAP.
+    torch.save({"model": model.model}, pruned_model_path)
 
     # fine-tuning
     for name, param in model.model.named_parameters():
