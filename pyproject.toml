@@ -4,13 +4,14 @@ version = "0.1.0"
 description = "YOLOv11n pruning and finetuning experiments"
 requires-python = ">=3.10"
 dependencies = [
-    "ultralytics>=8.3.0",
+    "ultralytics>=8.3.0,<8.4",  # 8.4 breaks torch-pruning (index OOB in GroupNormPruner)
     "torch>=2.0.0",
     "torch-pruning>=1.4.0",
     "onnxruntime>=1.16.0",
     "pyyaml>=6.0",
     "numpy>=1.24.0",
     "opencv-python>=4.8.0",
+    "rich>=13.0.0",  # scripts/display_results.py
 ]
 
 [project.optional-dependencies]
