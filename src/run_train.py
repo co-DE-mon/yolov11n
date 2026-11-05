@@ -111,6 +111,7 @@ def main():
                 "--batch_size", str(batch),
                 "--target_prune_rate", str(ratio / 100),
                 "--dataset", dataset,
+                "--device", device,
             ])
 
             if status != 0:

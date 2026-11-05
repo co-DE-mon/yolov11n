@@ -9,6 +9,7 @@ from ultralytics import YOLO
 from ultralytics.nn.modules import Attention
 from ultralytics.utils import YAML
 from ultralytics.utils.checks import check_yaml
+from ultralytics.utils.torch_utils import select_device
 
 from src.models.c3k2 import replace_c3k2_with_c3k2_v2
 from src.training.trainer import train_v2
@@ -87,8 +88,10 @@ def prune(args: argparse.Namespace):
     for name, param in model.model.named_parameters():
         param.requires_grad = True
 
-    # Establish a single device early and ensure model + example inputs match
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # Establish a single device early and ensure model + example inputs match.
+    # select_device raises if a GPU is requested but CUDA is unavailable, instead of silently using CPU.
+    device = select_device(args.device)
+    pruning_cfg['device'] = args.device
     model.model.to(device)
     example_inputs = torch.randn(1, 3, pruning_cfg["imgsz"], pruning_cfg["imgsz"], device=device)
 
@@ -163,6 +166,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', default=4, type=int, help='Batch Size')
     parser.add_argument('--target_prune_rate', default=0.5, type=float, help='Target pruning rate')
     parser.add_argument('--dataset', default='dataset', type=str, help='Dataset name for output naming')
+    parser.add_argument('--device', default='0', help="GPU id (e.g. '0') or 'cpu'")
 
     args = parser.parse_args()
     pruned_model = prune(args)
