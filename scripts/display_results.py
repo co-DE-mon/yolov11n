@@ -83,9 +83,6 @@ def load_metrics_from_runs(runs_dir: Path, dataset: str) -> dict:
             if not rows:
                 continue
 
-            # Get best metrics (last row typically, or we could find max mAP)
-            last_row = rows[-1]
-
             # Handle column name variations (may have spaces)
             def get_col(row, *names):
                 for n in names:
@@ -94,11 +91,14 @@ def load_metrics_from_runs(runs_dir: Path, dataset: str) -> dict:
                             return float(row[key])
                 return 0.0
 
+            # Use the epoch best.pt was saved from (max fitness = mAP50-95), so metrics match the benchmarked model
+            best_row = max(rows, key=lambda r: get_col(r, "mAP50-95(B)", "mAP50-95"))
+
             metrics[(batch, prune_pct)] = {
-                "precision": get_col(last_row, "precision"),
-                "recall": get_col(last_row, "recall"),
-                "mAP50": get_col(last_row, "mAP50(B)", "mAP50"),
-                "mAP50-95": get_col(last_row, "mAP50-95(B)", "mAP50-95"),
+                "precision": get_col(best_row, "precision"),
+                "recall": get_col(best_row, "recall"),
+                "mAP50": get_col(best_row, "mAP50(B)", "mAP50"),
+                "mAP50-95": get_col(best_row, "mAP50-95(B)", "mAP50-95"),
             }
 
     return metrics
