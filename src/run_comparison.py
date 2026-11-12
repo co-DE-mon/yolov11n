@@ -108,15 +108,15 @@ def benchmark_pytorch(model_path: Path, imgsz: int, batch: int, iters: int, devi
     return (perf_counter() - t0) * 1000 / iters
 
 
-def benchmark_onnx(model_path: Path, imgsz: int, batch: int, iters: int) -> float:
-    """Benchmark pre-exported ONNX model. Returns avg ms per image."""
+def benchmark_onnx(model_path: Path, imgsz: int, batch: int, iters: int) -> tuple[float, str]:
+    """Benchmark pre-exported ONNX model. Returns (avg ms per image, execution provider actually used)."""
     import onnxruntime as ort
 
     # Look for pre-exported ONNX file
     onnx_path = model_path.with_suffix(".onnx")
     if not onnx_path.exists():
         print(f"    [WARN] ONNX not found: {onnx_path.name}, run 'python -m src.run_export' first")
-        return float("nan")
+        return float("nan"), "none"
 
     providers = []
     if "CUDAExecutionProvider" in ort.get_available_providers():
@@ -124,6 +124,8 @@ def benchmark_onnx(model_path: Path, imgsz: int, batch: int, iters: int) -> floa
     providers.append("CPUExecutionProvider")
 
     session = ort.InferenceSession(str(onnx_path), providers=providers)
+    # ORT silently falls back to CPU if CUDA fails to initialize, so report what the session really uses
+    provider = session.get_providers()[0]
     input_name = session.get_inputs()[0].name
     inp = np.random.randn(batch, 3, imgsz, imgsz).astype(np.float32)
 
@@ -134,7 +136,7 @@ def benchmark_onnx(model_path: Path, imgsz: int, batch: int, iters: int) -> floa
     for _ in range(iters):
         session.run(None, {input_name: inp})
 
-    return (perf_counter() - t0) * 1000 / iters / batch
+    return (perf_counter() - t0) * 1000 / iters / batch, provider
 
 
 def main():
@@ -179,11 +181,12 @@ def main():
         # Baseline stats
         base_params, base_gflops = get_model_stats(baseline, args.imgsz)
         base_pt_ms = benchmark_pytorch(baseline, args.imgsz, args.batch, args.iters, args.device)
-        base_onnx_ms = benchmark_onnx(baseline, args.imgsz, args.batch, args.iters)
+        base_onnx_ms, onnx_provider = benchmark_onnx(baseline, args.imgsz, args.batch, args.iters)
+        print(f"  PyTorch device: {args.device} | ONNX provider: {onnx_provider}")
 
         md_rows = [
             f"### Batch size {batch_size}",
-            "| Pruning % | Params (M) | FLOPs Reduction | PyTorch Speedup | ONNX Speedup |",
+            f"| Pruning % | Params (M) | FLOPs Reduction | PyTorch Speedup ({args.device}) | ONNX Speedup ({onnx_provider}) |",
             "|-----------|-----------:|----------------:|----------------:|-------------:|",
             f"| 0% (baseline) | {base_params:.2f} | - | 1.00x | 1.00x |",
         ]
@@ -194,7 +197,7 @@ def main():
 
             params, gflops = get_model_stats(pruned_path, args.imgsz)
             pt_ms = benchmark_pytorch(pruned_path, args.imgsz, args.batch, args.iters, args.device)
-            onnx_ms = benchmark_onnx(pruned_path, args.imgsz, args.batch, args.iters)
+            onnx_ms, _ = benchmark_onnx(pruned_path, args.imgsz, args.batch, args.iters)
 
             flops_red = (gflops - base_gflops) / base_gflops * 100 if base_gflops else 0
             pt_speedup = base_pt_ms / pt_ms if pt_ms else 0
@@ -210,6 +213,8 @@ def main():
                 "onnx_ms": onnx_ms,
                 "pytorch_speedup": pt_speedup,
                 "onnx_speedup": onnx_speedup,
+                "pytorch_device": args.device,
+                "onnx_provider": onnx_provider,
             })
 
             md_rows.append(

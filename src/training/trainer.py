@@ -95,9 +95,6 @@ def train_v2(self: YOLO, pruning=False, **kwargs):
     if overrides.get('resume'):
         overrides['resume'] = self.ckpt_path
 
-    if pruning:
-        overrides['model'] = 'yolo11n.pt'
-
     self.task = overrides.get('task') or self.task
     task_map = self.task_map
     self.trainer = task_map[self.task]["trainer"](overrides=overrides, _callbacks=self.callbacks)

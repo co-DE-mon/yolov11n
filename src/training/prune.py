@@ -1,4 +1,5 @@
 import argparse
+from copy import deepcopy
 from pathlib import Path
 
 import torch
@@ -8,9 +9,51 @@ from ultralytics import YOLO
 from ultralytics.nn.modules import Attention
 from ultralytics.utils import YAML
 from ultralytics.utils.checks import check_yaml
+from ultralytics.utils.torch_utils import select_device
 
 from src.models.c3k2 import replace_c3k2_with_c3k2_v2
 from src.training.trainer import train_v2
+
+
+def count_params(model) -> int:
+    return sum(p.numel() for p in model.parameters())
+
+
+def build_pruner(model, example_inputs, pruning_ratio: float):
+    """One-shot GroupNorm pruner; Attention blocks are left unpruned."""
+    return tp.pruner.GroupNormPruner(
+        model,
+        example_inputs,
+        importance=tp.importance.GroupMagnitudeImportance(),
+        iterative_steps=1,
+        pruning_ratio=pruning_ratio,
+        ignored_layers=[m for m in model.modules() if isinstance(m, Attention)],
+    )
+
+
+def calibrate_pruning_ratio(model, example_inputs, target: float, tol: float = 0.005, max_iter: int = 20) -> tuple[float, float]:
+    """Binary-search the channel pruning ratio whose one-shot prune removes `target` fraction of params.
+
+    Params shrink roughly quadratically with channels, so the ratio is found empirically on copies of the model.
+    Returns (pruning_ratio, achieved fraction of params removed).
+    """
+    n0 = count_params(model)
+    lo, hi = 0.0, 0.99
+    best = (0.0, 0.0)
+    for _ in range(max_iter):
+        mid = (lo + hi) / 2
+        trial = deepcopy(model)
+        build_pruner(trial, example_inputs, mid).step()
+        removed = 1 - count_params(trial) / n0
+        if abs(removed - target) < abs(best[1] - target):
+            best = (mid, removed)
+        if abs(removed - target) <= tol:
+            break
+        if removed < target:
+            lo = mid
+        else:
+            hi = mid
+    return best
 
 
 def prune(args: argparse.Namespace):
@@ -45,60 +88,24 @@ def prune(args: argparse.Namespace):
     for name, param in model.model.named_parameters():
         param.requires_grad = True
 
-    # Establish a single device early and ensure model + example inputs match
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # Establish a single device early and ensure model + example inputs match.
+    # select_device raises if a GPU is requested but CUDA is unavailable, instead of silently using CPU.
+    device = select_device(args.device)
+    pruning_cfg['device'] = args.device
     model.model.to(device)
     example_inputs = torch.randn(1, 3, pruning_cfg["imgsz"], pruning_cfg["imgsz"], device=device)
 
-    # Count parameters for pruning ratio calculation
-    nparams = sum(p.numel() for p in model.model.parameters())
-
-    fixed_params = 0
-    for m in model.model.modules():
-        if isinstance(m, Attention):
-            fixed_params += sum(p.numel() for p in m.parameters(recurse=True))
-
-    prunable_params = nparams - fixed_params
-    target_prunable = (nparams*args.target_prune_rate)/prunable_params
-    pruning_ratio = target_prunable
-
-    iter_x=2
-    if args.target_prune_rate == 0.30:
-        pruning_ratio=0.34
-    if args.target_prune_rate == 0.50:
-        pruning_ratio=0.61
-    if args.target_prune_rate == 0.75:
-        pruning_ratio=0.54
-        iter_x=1
-    if target_prunable >= 1.0:
-        pruning_ratio = 0.99
-
-    # Pruning step
+    # Pruning step: find the channel ratio that removes target_prune_rate of params, then prune once
     model.model.train()
     for name, param in model.model.named_parameters():
         param.requires_grad = True
 
-    ignored_layers = []
-    unwrapped_parameters = []
-    for m in model.model.modules():
-        if isinstance(m, Attention):
-            ignored_layers.append(m)
+    nparams = count_params(model.model)
+    pruning_ratio, expected = calibrate_pruning_ratio(model.model, example_inputs, args.target_prune_rate)
+    print(f"Calibrated pruning_ratio={pruning_ratio:.4f} for target {args.target_prune_rate:.0%} (expected {expected:.1%} params removed)")
 
-    # Guarantee example_inputs resides on same device as model weights before tracing
-    model_device = next(model.model.parameters()).device
-    if example_inputs.device != model_device:
-        example_inputs = example_inputs.to(model_device)
-
-    pruner = tp.pruner.GroupNormPruner(
-        model.model,
-        example_inputs,
-        importance=tp.importance.GroupMagnitudeImportance(),
-        iterative_steps=iter_x,
-        pruning_ratio=pruning_ratio,
-        ignored_layers=ignored_layers,
-        unwrapped_parameters=unwrapped_parameters
-    )
-    pruner.step()
+    build_pruner(model.model, example_inputs, pruning_ratio).step()
+    print(f"Pruned params: {nparams:,} -> {count_params(model.model):,} ({1 - count_params(model.model) / nparams:.1%} removed)")
 
     # COMPREHENSIVE DEVICE SYNCHRONIZATION
     # Reaffirm model on target device (should already be) and keep example_inputs consistent
@@ -132,7 +139,9 @@ def prune(args: argparse.Namespace):
     save_dir_after = base_dir / "runs"
     save_dir_before.mkdir(parents=True, exist_ok=True)
     pruned_model_path = save_dir_before / f"{args.dataset}_batch{args.batch_size}_pruned{int(args.target_prune_rate*100)}_before_finetune.pt"
-    torch.save(model.model.state_dict(), pruned_model_path)
+    # Save the full module: a state_dict can't be reloaded because pruning changed the architecture.
+    # The {"model": ...} layout lets YOLO(pruned_model_path) load it, e.g. to measure pre-finetune mAP.
+    torch.save({"model": model.model}, pruned_model_path)
 
     # fine-tuning
     for name, param in model.model.named_parameters():
@@ -148,8 +157,8 @@ def prune(args: argparse.Namespace):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', default="examples/yolov11n/runs/fine_tuned_yolo11n/weights/best.pt", help='Model path')
-    parser.add_argument('--data', default="examples/yolov11n/BCCD/data.yaml", help='DATA path')
+    parser.add_argument('--model', required=True, help='Finetuned baseline weights, e.g. runs/BCCD_batch2_baseline/weights/best.pt')
+    parser.add_argument('--data', required=True, help='Dataset YAML, e.g. data/BCCD/data.yaml')
     parser.add_argument('--cfg', default='config/default.yaml',
                         help='Pruning config file.'
                              ' This file should have same format with ultralytics/yolo/cfg/default.yaml')
@@ -157,6 +166,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', default=4, type=int, help='Batch Size')
     parser.add_argument('--target_prune_rate', default=0.5, type=float, help='Target pruning rate')
     parser.add_argument('--dataset', default='dataset', type=str, help='Dataset name for output naming')
+    parser.add_argument('--device', default='0', help="GPU id (e.g. '0') or 'cpu'")
 
     args = parser.parse_args()
     pruned_model = prune(args)
